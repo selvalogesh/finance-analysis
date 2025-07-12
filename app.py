@@ -1,7 +1,8 @@
 import os
+import hashlib
+import subprocess
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
-from pdf_to_excel import pdf_to_excel
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -17,16 +18,26 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
     if file and file.filename.endswith('.pdf'):
+        file_hash = hashlib.sha256(file.read()).hexdigest()
+        file.seek(0)
         filename = secure_filename(file.filename)
-        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(pdf_path)
+        name, ext = os.path.splitext(filename)
+        new_filename = f"{name}_{file_hash}{ext}"
 
-        output_csv_path = os.path.join('output', f"{os.path.splitext(filename)[0]}.csv")
+        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+        
+        output_csv_path = os.path.join('output', f"{os.path.splitext(new_filename)[0]}.csv")
         os.makedirs('output', exist_ok=True)
 
+        if os.path.exists(pdf_path) and os.path.exists(output_csv_path):
+            return jsonify({"message": f"File {name}{ext} already exists."}), 200
+
+        file.save(pdf_path)
+
         try:
-            pdf_to_excel(pdf_path, csv_path=output_csv_path)
-            return jsonify({"message": f"File successfully converted and saved to {output_csv_path}"}), 200
+            command = f"python pdf_to_excel.py --csv {output_csv_path} {pdf_path}"
+            subprocess.Popen(command, shell=True)
+            return jsonify({"message": f"File upload successful. Conversion started for {new_filename}. Output will be at {output_csv_path}"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
     else:

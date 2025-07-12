@@ -21,7 +21,7 @@ def pdf_to_excel(pdf_path, excel_path='output.xlsx', csv_path=None):
                     col = table[0]
                     df = pd.DataFrame(table[1:], columns=col)
                 else:
-                    df = pd.DataFrame(table[0:1], columns=col)
+                    df = pd.DataFrame(table, columns=col)
                 all_tables.append(df)
     
     if all_tables:
